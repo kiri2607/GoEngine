@@ -12,47 +12,154 @@ using u32 = uint32_t;
 using i64 = int64_t;
 using u64 = uint64_t;
 
+inline const int DIM = 9;
+inline const int INTSZ = sizeof(i8) * 8;
+inline const int BITSETSZ = (DIM * DIM + INTSZ - 1) / INTSZ;
+inline const int HASHTABLESZ = 1 << 20;
+
 struct Pos{
     i8 i, j;
 };
 struct PosList{
     std::vector<Pos> list;
-    PosList(const std::vector<Pos> l = {});
-    std::vector<Pos>::const_iterator begin() const;
-    std::vector<Pos>::const_iterator end() const;
-    std::vector<Pos>::iterator begin();
-    std::vector<Pos>::iterator end();
-    Pos& front();
-    Pos& back();
-    bool empty() const;
-    size_t size() const;
-    void add(const Pos& m);
-    void pop();
-    void clear();
-    Pos& operator[](const int i);
-    const Pos& operator[](const int i) const;
+    PosList(const std::vector<Pos> l = {}): list(l) {}
+    std::vector<Pos>::const_iterator begin() const {
+        assert(!list.empty());
+        return list.begin();
+    }
+    std::vector<Pos>::const_iterator end() const {
+        return list.end();
+    }
+    std::vector<Pos>::iterator begin(){
+        assert(!list.empty());
+        return list.begin();
+    }
+    std::vector<Pos>::iterator end(){
+        return list.end();
+    }
+    Pos& front(){
+        assert(!list.empty());
+        return list.front();
+    }
+    Pos& back(){
+        assert(!list.empty());
+        return list.back();
+    }
+    bool empty() const {
+        return list.empty();
+    }
+    size_t size() const {
+        return list.size();
+    }
+    void add(const Pos& m){
+        list.push_back(m);
+    }
+    void pop(){
+        assert(!list.empty());
+        list.pop_back();
+    }
+    Pos& operator[](const int i){
+        assert(i >= 0 && i < size());
+        return list[i];
+    }
+    const Pos& operator[](const int i) const {
+        assert(i >= 0 && i < size());
+        return list[i];
+    }
+    void clear(){
+        list.clear();
+    }
 };
 struct History{
     std::vector<std::array<PosList, 2>> list;
-    History(const std::vector<std::array<PosList, 2>> l = std::vector<std::array<PosList, 2>>());
-    std::vector<std::array<PosList, 2>>::const_iterator begin() const;
-    std::vector<std::array<PosList, 2>>::const_iterator end() const;
-    std::vector<std::array<PosList, 2>>::iterator begin();
-    std::vector<std::array<PosList, 2>>::iterator end();
-    std::array<PosList, 2>& front();
-    std::array<PosList, 2>& back();
-    bool empty() const;
-    size_t size() const;
-    void add(const std::array<PosList, 2>& m);
-    void pop();
-    void clear();
-    std::array<PosList, 2>& operator[](const int i);
-    const std::array<PosList, 2>& operator[](const int i) const;
+    History(const std::vector<std::array<PosList, 2>> l = {}): list(l) {}
+    std::vector<std::array<PosList, 2>>::const_iterator begin() const {
+        assert(!list.empty());
+        return list.begin();
+    }
+    std::vector<std::array<PosList, 2>>::const_iterator end() const {
+        return list.end();
+    }
+    std::vector<std::array<PosList, 2>>::iterator begin() {
+        assert(!list.empty());
+        return list.begin();
+    }
+    std::vector<std::array<PosList, 2>>::iterator end() {
+        return list.end();
+    }
+    std::array<PosList, 2>& front(){
+        assert(!list.empty());
+        return list.front();
+    }
+    std::array<PosList, 2>& back(){
+        assert(!list.empty());
+        return list.back();
+    }
+    bool empty() const {
+        return list.empty();
+    }
+    size_t size() const {
+        return list.size();
+    }
+    void add(const std::array<PosList, 2>& m){
+        list.push_back(m);
+    }
+    void pop(){
+        assert(!list.empty());
+        list.pop_back();
+    }
+    void clear(){
+        list.clear();
+    }
+    std::array<PosList, 2>& operator[](const int i){
+        assert(i >= 0 && i < size());
+        return list[i];
+    }
+    const std::array<PosList, 2>& operator[](const int i) const {
+        assert(i >= 0 && i < size());
+        return list[i];
+    }
 };
 
-inline const int DIM = 9;
-inline const int INTSZ = sizeof(i8) * 8;
-inline const int BITSETSZ = (DIM * DIM + INTSZ - 1) / INTSZ;
+struct Zobrist{
+    u64 z[2];
+    Zobrist(){
+        std::fill(z, z + 2, 0);
+    }
+
+    bool operator==(const Zobrist& other) const {
+        return z[0] == other.z[0] && z[1] == other.z[1];
+    }
+};
+
+
+template<typename T>
+struct HashTable{
+    std::vector<std::pair<Zobrist, T>> tab[HASHTABLESZ];
+    const u64 mask = HASHTABLESZ - 1;
+    void s(const Zobrist& z, const T& val){
+        const u64 h = mask & z.z[0];
+        for(i32 i = 0; i < i32(tab[h].size()); i++){
+            if(tab[h][i].first == z){
+                if(val == T()) tab[h].erase(tab[h].begin() + i);
+                else tab[h][i].second = val;
+                return;
+            }
+        }
+        if(val != T()) tab[h].push_back({z, val});
+    }
+    T& g(const Zobrist& z){
+        const u64 h = mask & z.z[0];
+        for(auto& [zob, val] : tab[h]){
+            if(zob == z) return val;
+        }
+        tab[h].push_back({z, T()});
+        return tab[h].back().second;
+    }
+};
+
+
+
 
 inline const PosList adjc({
     {-1, 0},
