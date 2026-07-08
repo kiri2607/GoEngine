@@ -2,11 +2,11 @@
 
 #include "Types.hpp"
 #include <random>
+#include <chrono>
 
-class Rand{
+struct Rand{
     std::mt19937_64 gen;
-    public:
-    Rand(int seed = 1){
+    Rand(i64 seed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()){
         gen.seed(seed);
     }
     u64 randll(){
