@@ -72,8 +72,12 @@ void BitBoard::find_ones(PosList& l){
     }
 }
 
-Board::Board(float k){
+void Board::set_komi(float k){
     komi = k;
+}
+
+Board::Board(float k){
+    set_komi(k);
     hist_hash.s(hash, true);
 }
 
@@ -140,9 +144,15 @@ i8 Board::get_air(const Pos& pos, BitBoard& vis){
 
 
 i8 Board::get_air(const Pos& pos){
-    static BitBoard vis;
-    vis.clear();
-    return get_air(pos, vis); 
+    assert(pos.in_bounds());
+    i8 odp = 4;
+    for(const auto& dif : adjc){
+        const Pos posa = pos + dif;
+        if(!posa.in_bounds() || brd[0].g(posa) | brd[1].g(posa)){
+            odp--;
+        }
+    }
+    return odp;
 } 
 
 i8 Board::get_group_air(const PosList& group, BitBoard& vis) {
@@ -236,7 +246,7 @@ void Board::make_move(const Pos& pos, bool col){
     }
     assert(pos.in_bounds());
     assert(!brd[0].g(pos) && !brd[1].g(pos));
-
+    
     killed_groups.clear();
     changed_stones[0].clear();
     changed_stones[1].clear();
@@ -263,7 +273,7 @@ void Board::unmake_move(){
     for(int c = 0; c < 2; c++){
         for(auto move : hist.back()[c]){
             revert_stone(move, c);
-
+            
         }
     }
     hist.pop();
@@ -271,11 +281,30 @@ void Board::unmake_move(){
     hist_hash.s(hash, 0);
 }
 
-PosList Board::get_with_air_count(bool col, i8 cnt){ // sorted list of spots of air of groups that have 'cnt' spots of air
+void Board::filter_legal(PosList& poss, bool col){
+    static PosList odp;
+    odp.clear();
+    for(const auto& move : poss){
+        if(is_legal(move, col)) odp.add(move);
+    }
+    poss = odp;
+}
+
+void Board::filter_pos(PosList& poss, PosList& fil){
+    static PosList odp;
+    odp.clear();
+    std::sort(poss.begin(), poss.end());
+    std::sort(fil.begin(), fil.end());
+    std::set_intersection(poss.begin(), poss.end(), fil.begin(), fil.end(), std::back_inserter(odp));
+    poss = odp;
+}
+
+PosList Board::get_with_air_count(bool col, i8 cnt){
     static BitBoard vis;
     static BitBoard air;
+    static PosList odp;
     vis.clear();
-    PosList odp;
+    odp.clear();
     for(i8 i = 0; i < DIM; i++){
         for(i8 j = 0; j < DIM; j++){
             if(vis.g(i, j) || !brd[col].g(i, j)) continue;
@@ -292,21 +321,11 @@ PosList Board::get_with_air_count(bool col, i8 cnt){ // sorted list of spots of 
 }
 
 PosList Board::get_with_air_count(bool col, i8 cnt, const PosList& poss){
-    static BitBoard vis;
-    static BitBoard air;
-    vis.clear();
-    PosList odp;
-    for(const auto [i, j] : poss){
-        if(Pos{i, j} == PASS) continue;
-        if(vis.g(i, j) || !brd[col].g(i, j)) continue;
-        air.clear();
-        i8 gair = get_group_air(find_group({i, j}, vis), air);
-        if(gair == cnt){
-            air.find_ones(odp);
-        }
-    }
-    std::sort(odp.begin(), odp.end());
-    odp.list.erase(std::unique(odp.begin(), odp.end()), odp.end());
+    static PosList odp;
+    static PosList kopia;
+    kopia = poss;
+    odp = get_with_air_count(col, cnt);
+    filter_pos(odp, kopia);
     return odp;
 }
 
@@ -334,14 +353,6 @@ PosList Board::get_pseudo_legal_moves(bool col){
     return odp;
 }
 
-void Board::filter_legal(PosList& poss, bool col){
-    static PosList odp;
-    odp.clear();
-    for(const auto& move : poss){
-        if(is_legal(move, col)) odp.add(move);
-    }
-    poss = odp;
-}
 
 PosList Board::get_legal_moves(bool col){
     static PosList pseudo;
