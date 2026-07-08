@@ -295,7 +295,7 @@ void Board::filter_pos(PosList& poss, PosList& fil){
     odp.clear();
     std::sort(poss.begin(), poss.end());
     std::sort(fil.begin(), fil.end());
-    std::set_intersection(poss.begin(), poss.end(), fil.begin(), fil.end(), std::back_inserter(odp));
+    std::set_intersection(poss.begin(), poss.end(), fil.begin(), fil.end(), std::back_inserter(odp.list));
     poss = odp;
 }
 
