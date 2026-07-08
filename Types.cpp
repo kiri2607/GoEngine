@@ -13,7 +13,6 @@ std::vector<Pos>::const_iterator PosList::end() const {
     return list.end();
 }
 std::vector<Pos>::iterator PosList::begin(){
-    assert(!list.empty());
     return list.begin();
 }
 std::vector<Pos>::iterator PosList::end(){
@@ -53,7 +52,6 @@ void PosList::clear(){
 }
 History::History(const std::vector<std::array<PosList, 2>> l): list(l) {}
 std::vector<std::array<PosList, 2>>::const_iterator History::begin() const {
-    assert(!list.empty());
     return list.begin();
 }
 std::vector<std::array<PosList, 2>>::const_iterator History::end() const {
@@ -116,11 +114,12 @@ const u64& Zobrist::operator[](const int i) const {
 
 template<typename T>
 void HashTable<T>::clear(){
-    std::fill(stpos, stpos + HASHTABLESZ, -1);
+    std::fill(stpos.begin(), stpos.end(), -1);
     nodes.clear();
 }
 template<typename T>
 HashTable<T>::HashTable(){
+    stpos.resize(HASHTABLESZ);
     clear();
 }
 template<typename T>

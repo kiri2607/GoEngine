@@ -6,7 +6,10 @@
 
 struct Rand{
     std::mt19937_64 gen;
-    Rand(i64 seed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()){
+    // Rand(i64 seed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count()){
+    //     gen.seed(seed);
+    // }
+    Rand(i64 seed = 213769420){
         gen.seed(seed);
     }
     u64 randll(){
