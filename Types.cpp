@@ -6,7 +6,6 @@
 
 PosList::PosList(const std::vector<Pos> l): list(l) {}
 std::vector<Pos>::const_iterator PosList::begin() const {
-    assert(!list.empty());
     return list.begin();
 }
 std::vector<Pos>::const_iterator PosList::end() const {
@@ -19,11 +18,9 @@ std::vector<Pos>::iterator PosList::end(){
     return list.end();
 }
 Pos& PosList::front(){
-    assert(!list.empty());
     return list.front();
 }
 Pos& PosList::back(){
-    assert(!list.empty());
     return list.back();
 }
 bool PosList::empty() const {
@@ -36,15 +33,12 @@ void PosList::add(const Pos& m){
     list.push_back(m);
 }
 void PosList::pop(){
-    assert(!list.empty());
     list.pop_back();
 }
 Pos& PosList::operator[](const int i){
-    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
 const Pos& PosList::operator[](const int i) const {
-    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
 void PosList::clear(){

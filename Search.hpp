@@ -22,6 +22,7 @@ struct Search{
     Rand random;
     bool start_col;
     Board brd;
+    Board start_brd;
     Search(bool c, const Board& b);
     float Rollout(Board& b, bool c);
     float uct1(const MCTSNode& p, const MCTSNode& v, bool pcol) const;

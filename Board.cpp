@@ -12,6 +12,7 @@
 #include <iostream>
 #include <cstring>
 #include <unordered_map>
+#include <stack>
 
 
 
@@ -24,39 +25,39 @@ Board::Board(float k){
     hist_hash.s(hash, true);
 }
 
-PosList Board::find_group(const Pos& pos, BitBoard& vis){
-    static std::queue<Pos> q;
-    static PosList odp;
+void Board::find_group(PosList& buff, const Pos& pos, BitBoard& vis){
+    static PosList stack = []() {
+        PosList p;
+        p.list.reserve(DIM * DIM + 1);
+        return p;
+    }();
 
     assert(pos.in_bounds());
     assert(brd[0].g(pos) || brd[1].g(pos));
-    if(vis.g(pos)) return {};
-    while(!q.empty()) q.pop();
-    odp.clear();
+    stack.clear();
 
-    q.push(pos);
+    stack.add(pos);
     bool c = brd[1].g(pos);
     vis.s(pos, 1);
 
-    while(!q.empty()){
-        auto s = q.front();
-        q.pop();
-        odp.add(s);
+    while(!stack.empty()){
+        auto s = stack.back();
+        stack.pop();
+        buff.add(s);
         for(const auto& dif : adjc){
             const Pos sa = s + dif;
             if(!sa.in_bounds()) continue;
             if(vis.g(sa) || !brd[c].g(sa)) continue;
             vis.s(sa, 1);
-            q.push(sa);
+            stack.add(sa);
         }
     }
-    return odp;
 }
 
-PosList Board::find_group(const Pos& pos){
+void Board::find_group(PosList& buff, const Pos& pos){
     static BitBoard vis;
     vis.clear();
-    return find_group(pos, vis);
+    find_group(buff, pos, vis);
 }
 
 bool Board::is_eye(const Pos& pos, bool col){
@@ -122,30 +123,28 @@ void Board::revert_stone(const Pos& pos, bool col){
 }
 
 
-std::vector<PosList> Board::find_killed_groups(const Pos& pos, bool col){
+void Board::find_killed_groups(std::vector<PosList>& buff, const Pos& pos, bool col){
     static PosList group;
-    static std::vector<PosList> groups;
     static BitBoard vis;
     vis.clear();
     group.clear();
-    groups.clear();
     for(const auto& dif : adjc){
         const Pos posa = pos + dif;
         if(!posa.in_bounds()) continue;
         if(!brd[!col].g(posa)) continue;
         if(vis.g(posa)) continue;
-        group = find_group(posa, vis);
+        find_group(group, posa, vis);
         if(get_group_air(group) == 0){
-            groups.push_back(group);
+            buff.push_back(group);
         }
     }
-    return groups;
 }
 
 bool Board::is_legal(const Pos& pos, bool col){
     static std::vector<PosList> killed_groups;
     static BitBoard vis;
-    
+    static PosList group;
+    group.clear();
     if(pos == PASS) return true;
     assert(pos.in_bounds());
     vis.clear();
@@ -153,9 +152,9 @@ bool Board::is_legal(const Pos& pos, bool col){
     killed_groups.clear();
     revert_stone(pos, col);
 
-    killed_groups = find_killed_groups(pos, col);
-
-    if(killed_groups.size() == 0 && get_group_air(find_group(pos, vis)) == 0){
+    find_killed_groups(killed_groups, pos, col);
+    find_group(group, pos, vis);
+    if(killed_groups.size() == 0 && get_group_air(group) == 0){
         revert_stone(pos, col);
         return false;
     }
@@ -182,20 +181,18 @@ bool Board::is_legal(const Pos& pos, bool col){
 void Board::make_move(const Pos& pos, bool col){
     static std::vector<PosList> killed_groups;
     if(pos == PASS){
-        hist.add({brd, hash, passes});
         passes++;
         return;
     }
     assert(pos.in_bounds());
     assert(!brd[0].g(pos) && !brd[1].g(pos));
-    hist.add({brd, hash, passes});
     hist_hash.s(hash, 1);
 
     passes = 0;
     
     killed_groups.clear();
     revert_stone(pos, col);
-    killed_groups = find_killed_groups(pos, col);
+    find_killed_groups(killed_groups, pos, col);
     for(auto g : killed_groups){
         for(auto gpos : g){
             revert_stone(gpos, !col);
@@ -203,78 +200,48 @@ void Board::make_move(const Pos& pos, bool col){
     }
 }
 
-void Board::unmake_move(){
-    assert(!hist.empty());
-    if(passes > 0){
-        passes--;
-        brd = hist.back().brd;
-        hist.pop();
-        return;
-    }
-    brd = hist.back().brd;
-    hash = hist.back().hash;
-    passes = hist.back().passes;
-    hist.pop();
-    hist_hash.s(hash, 0);
-}
-
 void Board::filter_legal(PosList& poss, bool col){
-    static PosList odp;
-    odp.clear();
-    for(const auto& move : poss){
-        if(is_legal(move, col)) odp.add(move);
+    i32 size = 0;
+    for(i32 i = 0; i < i32(poss.size()); i++){
+        if(is_legal(poss[i], col)){
+            poss[size] = poss[i];
+            size++;
+        }
     }
-    poss = odp;
+    poss.list.resize(size);
 }
 
-void Board::filter_pos(PosList& poss, PosList& fil){
-    static PosList odp;
-    odp.clear();
-    std::sort(poss.begin(), poss.end());
-    std::sort(fil.begin(), fil.end());
-    std::set_intersection(poss.begin(), poss.end(), fil.begin(), fil.end(), std::back_inserter(odp.list));
-    poss = odp;
-}
 
-PosList Board::get_with_air_count(bool col, i8 cnt){
+
+void Board::get_with_air_count(PosList& buff, bool col, i8 cnt){
     static BitBoard vis;
     static BitBoard air;
-    static PosList odp;
+    static PosList group;
     vis.clear();
-    odp.clear();
     for(i8 i = 0; i < DIM; i++){
         for(i8 j = 0; j < DIM; j++){
             if(vis.g(i, j) || !brd[col].g(i, j)) continue;
             air.clear();
-            i8 gair = get_group_air(find_group({i, j}, vis), air);
+            group.clear();
+            find_group(group, {i, j}, vis);
+            i8 gair = get_group_air(group, air);
             if(gair == cnt){
-                air.find_ones(odp);
+                air.find_ones(buff);
             }
         }
     }
-    std::sort(odp.begin(), odp.end());
-    odp.list.erase(std::unique(odp.begin(), odp.end()), odp.end());
-    return odp;
+    std::sort(buff.begin(), buff.end());
+    buff.list.erase(std::unique(buff.begin(), buff.end()), buff.end());
 }
 
-PosList Board::get_with_air_count(bool col, i8 cnt, const PosList& poss){
-    static PosList odp;
-    static PosList kopia;
-    kopia = poss;
-    odp = get_with_air_count(col, cnt);
-    filter_pos(odp, kopia);
-    return odp;
-}
-
-PosList Board::get_pseudo_legal_moves(bool col){
-    static PosList odp;
+void Board::get_pseudo_legal_moves(PosList& buff, bool col){
     static PosList myata;
     static PosList opata;
-    myata = get_with_air_count(col, 1);
-    opata = get_with_air_count(!col, 1);
+    get_with_air_count(myata, col, 1);
+    get_with_air_count(opata, !col, 1);
     std::sort(myata.begin(), myata.end(), std::greater<Pos>());
     std::sort(opata.begin(), opata.end(), std::greater<Pos>());
-    odp.clear();
+    buff.clear();
     for(i8 i = 0; i < DIM; i++){
         for(i8 j = 0; j < DIM; j++){
             while(!myata.empty() && myata.back() < Pos{i, j}) myata.pop();
@@ -283,66 +250,67 @@ PosList Board::get_pseudo_legal_moves(bool col){
             if((!myata.empty() && myata.back() == Pos{i, j} && (opata.empty() || opata.back() != Pos{i, j})) || ((opata.empty() || opata.back() != Pos{i, j}) && is_eye({i, j}, !col))){
                 continue;
             }
-            odp.add({i, j});
+            buff.add({i, j});
         }
     }
-    odp.add(PASS);
-    return odp;
+    buff.add(PASS);
 }
 
 
-PosList Board::get_legal_moves(bool col){
-    static PosList pseudo;
-    pseudo = get_pseudo_legal_moves(col);
-    filter_legal(pseudo, col);
-    return pseudo;
+void Board::get_legal_moves(PosList& buff, bool col){
+    get_pseudo_legal_moves(buff, col);
+    filter_legal(buff, col);
 }
 
 
 float Board::end_game_result(){
     static BitBoard scr[2];
-    static std::queue<Pos> q;
-    while(!q.empty()) q.pop();
+    static PosList stack = []() {
+        PosList p;
+        p.list.reserve(DIM * DIM + 1);
+        return p;
+    }();
+    stack.clear();
     scr[0].clear();
     scr[1].clear();
     
     for(i8 i = 0; i < DIM; i++){
         for(i8 j = 0; j < DIM; j++){
             if(brd[0].g(i, j)){
-                q.push({i, j});
+                stack.add({i, j});
                 scr[0].s(i, j, 1);
             }
         }
     }
-    while(!q.empty()){
-        auto s = q.front();
-        q.pop();
+    while(!stack.empty()){
+        auto s = stack.back();
+        stack.pop();
         for(const auto& dif : adjc){
             const Pos sa = s + dif;
             if(!sa.in_bounds()) continue;
             if(scr[0].g(sa) || brd[1].g(sa)) continue;
             scr[0].s(sa, 1);
-            q.push({sa});
+            stack.add({sa});
         }
     }
 
     for(i8 i = 0; i < DIM; i++){
         for(i8 j = 0; j < DIM; j++){
             if(brd[1].g(i, j)){
-                q.push({i, j});
+                stack.add({i, j});
                 scr[1].s(i, j, 1);
             }
         }
     }
-    while(!q.empty()){
-        auto s = q.front();
-        q.pop();
+    while(!stack.empty()){
+        auto s = stack.back();
+        stack.pop();
         for(const auto& dif : adjc){
             const Pos sa = s + dif;
             if(!sa.in_bounds()) continue;
             if(scr[1].g(sa) || brd[0].g(sa)) continue;
             scr[1].s(sa, 1);
-            q.push({sa});
+            stack.add({sa});
         }
     }
 
@@ -363,11 +331,9 @@ bool Board::games_end() const {
     return passes >= 2;
 }
 
-
 std::array<BitBoard, 2> Board::get_board(){
     return brd;
 }
-    
 
 void print_bitboard(const std::array<BitBoard, 2> b){
     for(int i = 0; i < DIM; i++){

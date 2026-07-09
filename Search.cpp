@@ -6,12 +6,11 @@ float Search::Rollout(Board& b, bool c){
     static PosList moves;
     static PosList filtered;
     moves.clear();
-    i32 howmany = 0;
     // std::cerr << "before rollout:\n";
     // print_bitboard(brd.get_board());
     // std::cerr << std::endl;
     while(!b.games_end()){
-        moves = b.get_legal_moves(c);
+        b.get_legal_moves(moves, c);
         std::shuffle(moves.begin(), moves.end(), random.gen);
         // Pos move = PASS;
         // for(int i = 1; i <= 3; i++){
@@ -24,12 +23,8 @@ float Search::Rollout(Board& b, bool c){
         // }
         // if(move != PASS) move = moves[random.rand(0, u32(moves.size()) - 1)];
         b.make_move(moves[0], c);
-        howmany++;
         c = !c;
     } 
-    while(howmany--){
-        b.unmake_move();
-    }
     // std::cerr << "after rollout:\n";
     // print_bitboard(brd.get_board());
     // std::cerr << std::endl;
@@ -39,11 +34,12 @@ float Search::Rollout(Board& b, bool c){
 Search::Search(bool c, const Board& b){
     start_col = c;
     tree.push_back(MCTSNode());
+    start_brd = b;
     brd = b;
     float roll = Rollout(brd, start_col);
     tree.front().n = 1;
     tree.front().wwin = roll;
-    tree.front().legal = brd.get_legal_moves(start_col);
+    brd.get_legal_moves(tree.front().legal, start_col);
     std::shuffle(tree.front().legal.begin(), tree.front().legal.end(), random.gen);
 }
 
@@ -83,7 +79,7 @@ SelectResult Search::Selection(){
     brd.make_move(tree[g].legal[tree[g].chil.size() - 1], col);
     g = tree[g].chil.back();
     col = !col;
-    tree[g].legal = brd.get_legal_moves(col);
+    brd.get_legal_moves(tree[g].legal, col);
     std::shuffle(tree[g].legal.begin(), tree[g].legal.end(), random.gen);
     return {g, Rollout(brd, col)};
 }
@@ -92,7 +88,6 @@ void Search::Backprop(const SelectResult& sres){
     int g = sres.ind;
     float res = sres.res;
     while(g != -1){
-        if(g != 0) brd.unmake_move();
         tree[g].n++;
         tree[g].wwin += res;
         res = 1 - res;
@@ -101,6 +96,7 @@ void Search::Backprop(const SelectResult& sres){
 }
 
 void Search::Cycle(){
+    brd = start_brd;
     Backprop(Selection());
 }
 
