@@ -13,64 +13,7 @@
 #include <cstring>
 #include <unordered_map>
 
-inline i8 spla(i8 i, i8 j){
-    return i * DIM + j;
-}
-inline Pos rozs(i8 i){
-    return {static_cast<i8>(i / DIM), static_cast<i8>(i % DIM)};
-}
-void BitSet::clear(){
-    std::fill(tab, tab + BITSETSZ, 0);
-}
-BitSet::BitSet(){
-    clear();
-}
-u8 BitSet::g(const i8 i) const {
-    assert(i >= 0 && i < BITSETSZ * 8);
-    return bool(tab[i / INTSZ] & (1 << (i % INTSZ)));
-}
-void BitSet::s(const i8 i, const bool v){
-    assert(i >= 0 && i < BITSETSZ * 8);
-    tab[i / INTSZ] &= ~(1 << (i % INTSZ));
-    tab[i / INTSZ] |= (1 << (i % INTSZ)) * v;
-}
-bool BitSet::operator==(const BitSet& other) const {
-    for(i8 i = 0; i < BITSETSZ; i++){
-        if(tab[i] != other.tab[i]) return false;
-    }
-    return true;
-}
-BitBoard::BitBoard(): BitSet(){}
 
-u8 BitBoard::g(const i8 i, const i8 j) const {
-    const i8 sp = spla(i, j);
-    return BitSet::g(sp);
-}
-void BitBoard::s(const i8 i, const i8 j, const bool v){
-    const i8 sp = spla(i, j);
-    BitSet::s(sp, v);
-}
-
-u8 BitBoard::g(const Pos& pos) const {
-    const i8 sp = spla(pos.i, pos.j);
-    return BitSet::g(sp);
-}
-void BitBoard::s(const Pos& pos, const bool v){
-    const i8 sp = spla(pos.i, pos.j);
-    BitSet::s(sp, v);
-}
-
-void BitBoard::find_ones(PosList& l){
-    for(int i = 0; i < BITSETSZ; i++){
-        if(tab[i] == 0) continue;
-        u8 kopia = tab[i];
-        while(kopia != 0){
-            auto g = std::__lg(kopia);
-            l.add(rozs(INTSZ * i + g));
-            kopia ^= (1 << g);
-        }
-    }
-}
 
 void Board::set_komi(float k){
     komi = k;
@@ -238,46 +181,40 @@ bool Board::is_legal(const Pos& pos, bool col){
 
 void Board::make_move(const Pos& pos, bool col){
     static std::vector<PosList> killed_groups;
-    static std::array<PosList, 2> changed_stones;
     if(pos == PASS){
+        hist.add({brd, hash, passes});
         passes++;
-        hist.add({});
         return;
     }
     assert(pos.in_bounds());
     assert(!brd[0].g(pos) && !brd[1].g(pos));
+    hist.add({brd, hash, passes});
+    hist_hash.s(hash, 1);
+
+    passes = 0;
     
     killed_groups.clear();
-    changed_stones[0].clear();
-    changed_stones[1].clear();
     revert_stone(pos, col);
-    changed_stones[col].add(pos);
     killed_groups = find_killed_groups(pos, col);
     for(auto g : killed_groups){
         for(auto gpos : g){
             revert_stone(gpos, !col);
-            changed_stones[!col].add(gpos);
         }
     }
-    hist.add(changed_stones);
-    hist_hash.s(hash, 1);
 }
 
 void Board::unmake_move(){
     assert(!hist.empty());
-    if(hist.back()[0].empty() && hist.back()[1].empty()){
+    if(passes > 0){
         passes--;
+        brd = hist.back().brd;
         hist.pop();
         return;
     }
-    for(int c = 0; c < 2; c++){
-        for(auto move : hist.back()[c]){
-            revert_stone(move, c);
-            
-        }
-    }
+    brd = hist.back().brd;
+    hash = hist.back().hash;
+    passes = hist.back().passes;
     hist.pop();
-    passes = (!hist.empty() && hist.back()[0].empty() && hist.back()[1].empty());
     hist_hash.s(hash, 0);
 }
 
@@ -427,12 +364,12 @@ bool Board::games_end() const {
 }
 
 
-BitBoard* Board::get_board(){
+std::array<BitBoard, 2> Board::get_board(){
     return brd;
 }
     
 
-void print_bitboard(const BitBoard* b){
+void print_bitboard(const std::array<BitBoard, 2> b){
     for(int i = 0; i < DIM; i++){
         for(int j = 0; j < DIM; j++){
             if(b[0].g(i, j)) std::cerr << 'X';

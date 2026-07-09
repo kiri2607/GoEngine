@@ -13,30 +13,11 @@
 #include <cstring>
 #include <unordered_map>
 
-inline i8 spla(i8 i, i8 j);
-inline i8 rozs(i8 i, i8 j);
-struct BitSet{
-    u8 tab[BITSETSZ];
-    void clear();
-    BitSet();
-    u8 g(const i8 i) const;
-    void s(const i8 i, const bool v);
-    bool operator==(const BitSet& other) const;
-};
 
-struct BitBoard: public BitSet{
-    BitBoard();
-
-    u8 g(const i8 i, const i8 j) const;
-    u8 g(const Pos& pos) const;
-    void s(const i8 i, const i8 j, const bool v);
-    void s(const Pos& pos, const bool v);
-    void find_ones(PosList& l); 
-};
 
 struct Board{
 
-    BitBoard brd[2];
+    std::array<BitBoard, 2> brd;
     Zobrist hash;
     HashTable<bool> hist_hash;
     History hist;
@@ -64,8 +45,8 @@ struct Board{
     PosList get_with_air_count(bool col, i8 cnt, const PosList& poss); // 'get_with_air_count(bool, i8) but posistins are filtered using poss
     float end_game_result(); // if the game has ended, what is the result (0, 0.5, 1)
     bool games_end() const; // has the game ended?
-    BitBoard* get_board(); // get boards state
+    std::array<BitBoard, 2> get_board(); // get boards state
     
 };
 
-void print_bitboard(const BitBoard* b);
+void print_bitboard(const std::array<BitBoard, 2> b);

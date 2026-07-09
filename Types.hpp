@@ -45,22 +45,26 @@ struct PosList{
     const Pos& operator[](const int i) const;
     void clear();
 };
-struct History{
-    std::vector<std::array<PosList, 2>> list;
-    History(const std::vector<std::array<PosList, 2>> l = {});
-    std::vector<std::array<PosList, 2>>::const_iterator begin() const;
-    std::vector<std::array<PosList, 2>>::const_iterator end() const;
-    std::vector<std::array<PosList, 2>>::iterator begin();
-    std::vector<std::array<PosList, 2>>::iterator end();
-    std::array<PosList, 2>& front();
-    std::array<PosList, 2>& back();
-    bool empty() const;
-    size_t size() const;
-    void add(const std::array<PosList, 2>& m);
-    void pop();
+
+inline i8 spla(i8 i, i8 j);
+inline i8 rozs(i8 i, i8 j);
+struct BitSet{
+    u8 tab[BITSETSZ];
     void clear();
-    std::array<PosList, 2>& operator[](const int i);
-    const std::array<PosList, 2>& operator[](const int i) const;
+    BitSet();
+    u8 g(const i8 i) const;
+    void s(const i8 i, const bool v);
+    bool operator==(const BitSet& other) const;
+};
+
+struct BitBoard: public BitSet{
+    BitBoard();
+
+    u8 g(const i8 i, const i8 j) const;
+    u8 g(const Pos& pos) const;
+    void s(const i8 i, const i8 j, const bool v);
+    void s(const Pos& pos, const bool v);
+    void find_ones(PosList& l); 
 };
 
 struct Zobrist{
@@ -71,6 +75,31 @@ struct Zobrist{
     u64& operator[](const int i);
     const u64& operator[](const int i) const;
 };
+
+struct HistoryEntry{
+    std::array<BitBoard, 2> brd;
+    Zobrist hash;
+    i8 passes;
+};
+
+struct History{
+    std::vector<HistoryEntry> list;
+    History(const std::vector<HistoryEntry> l = {});
+    std::vector<HistoryEntry>::const_iterator begin() const;
+    std::vector<HistoryEntry>::const_iterator end() const;
+    std::vector<HistoryEntry>::iterator begin();
+    std::vector<HistoryEntry>::iterator end();
+    HistoryEntry& front();
+    HistoryEntry& back();
+    bool empty() const;
+    size_t size() const;
+    void add(const HistoryEntry& m);
+    void pop();
+    void clear();
+    HistoryEntry& operator[](const int i);
+    const HistoryEntry& operator[](const int i) const;
+};
+
 
 
 template<typename T>

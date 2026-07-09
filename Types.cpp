@@ -40,35 +40,109 @@ void PosList::pop(){
     list.pop_back();
 }
 Pos& PosList::operator[](const int i){
-    assert(i >= 0 && i < size());
+    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
 const Pos& PosList::operator[](const int i) const {
-    assert(i >= 0 && i < size());
+    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
 void PosList::clear(){
     list.clear();
 }
-History::History(const std::vector<std::array<PosList, 2>> l): list(l) {}
-std::vector<std::array<PosList, 2>>::const_iterator History::begin() const {
+
+
+
+inline i8 spla(i8 i, i8 j){
+    return i * DIM + j;
+}
+inline Pos rozs(i8 i){
+    return {static_cast<i8>(i / DIM), static_cast<i8>(i % DIM)};
+}
+
+
+
+
+void BitSet::clear(){
+    std::fill(tab, tab + BITSETSZ, 0);
+}
+BitSet::BitSet(){
+    clear();
+}
+u8 BitSet::g(const i8 i) const {
+    assert(i >= 0 && i < BITSETSZ * 8);
+    return bool(tab[i / INTSZ] & (1 << (i % INTSZ)));
+}
+void BitSet::s(const i8 i, const bool v){
+    assert(i >= 0 && i < BITSETSZ * 8);
+    tab[i / INTSZ] &= ~(1 << (i % INTSZ));
+    tab[i / INTSZ] |= (1 << (i % INTSZ)) * v;
+}
+bool BitSet::operator==(const BitSet& other) const {
+    for(i8 i = 0; i < BITSETSZ; i++){
+        if(tab[i] != other.tab[i]) return false;
+    }
+    return true;
+}
+
+
+
+
+BitBoard::BitBoard(): BitSet(){}
+
+u8 BitBoard::g(const i8 i, const i8 j) const {
+    const i8 sp = spla(i, j);
+    return BitSet::g(sp);
+}
+void BitBoard::s(const i8 i, const i8 j, const bool v){
+    const i8 sp = spla(i, j);
+    BitSet::s(sp, v);
+}
+
+u8 BitBoard::g(const Pos& pos) const {
+    const i8 sp = spla(pos.i, pos.j);
+    return BitSet::g(sp);
+}
+void BitBoard::s(const Pos& pos, const bool v){
+    const i8 sp = spla(pos.i, pos.j);
+    BitSet::s(sp, v);
+}
+
+void BitBoard::find_ones(PosList& l){
+    for(int i = 0; i < BITSETSZ; i++){
+        if(tab[i] == 0) continue;
+        u8 kopia = tab[i];
+        while(kopia != 0){
+            auto g = std::__lg(kopia);
+            l.add(rozs(INTSZ * i + g));
+            kopia ^= (1 << g);
+        }
+    }
+}
+
+
+
+
+
+History::History(const std::vector<HistoryEntry> l): list(l) {}
+std::vector<HistoryEntry>::const_iterator History::begin() const {
     return list.begin();
 }
-std::vector<std::array<PosList, 2>>::const_iterator History::end() const {
+std::vector<HistoryEntry>::const_iterator History::end() const {
     return list.end();
 }
-std::vector<std::array<PosList, 2>>::iterator History::begin() {
+std::vector<HistoryEntry>::iterator History::begin() {
     assert(!list.empty());
     return list.begin();
 }
-std::vector<std::array<PosList, 2>>::iterator History::end() {
+std::vector<HistoryEntry>::iterator History::end() {
     return list.end();
 }
-std::array<PosList, 2>& History::front(){
+HistoryEntry& History::front(){
     assert(!list.empty());
     return list.front();
 }
-std::array<PosList, 2>& History::back(){
+HistoryEntry& History::back(){
     assert(!list.empty());
     return list.back();
 }
@@ -78,7 +152,7 @@ bool History::empty() const {
 size_t History::size() const {
     return list.size();
 }
-void History::add(const std::array<PosList, 2>& m){
+void History::add(const HistoryEntry& m){
     list.push_back(m);
 }
 void History::pop(){
@@ -88,12 +162,12 @@ void History::pop(){
 void History::clear(){
     list.clear();
 }
-std::array<PosList, 2>& History::operator[](const int i){
-    assert(i >= 0 && i < size());
+HistoryEntry& History::operator[](const int i){
+    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
-const std::array<PosList, 2>& History::operator[](const int i) const {
-    assert(i >= 0 && i < size());
+const HistoryEntry& History::operator[](const int i) const {
+    assert(i >= 0 && size_t(i) < size());
     return list[i];
 }
 

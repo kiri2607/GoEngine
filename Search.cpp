@@ -13,17 +13,17 @@ float Search::Rollout(Board& b, bool c){
     while(!b.games_end()){
         moves = b.get_legal_moves(c);
         std::shuffle(moves.begin(), moves.end(), random.gen);
-        Pos move = PASS;
-        for(int i = 1; i <= 3; i++){
-            filtered = b.get_with_air_count(!c, i, moves);
-            if(filtered.empty()){
-                continue;
-            }
-            move = filtered[random.rand(0, u32(filtered.size()) - 1)];
-            break;
-        }
-        if(move != PASS) move = moves[random.rand(0, u32(moves.size()) - 1)];
-        b.make_move(move, c);
+        // Pos move = PASS;
+        // for(int i = 1; i <= 3; i++){
+        //     filtered = b.get_with_air_count(!c, i, moves);
+        //     if(filtered.empty()){
+        //         continue;
+        //     }
+        //     move = filtered[random.rand(0, u32(filtered.size()) - 1)];
+        //     break;
+        // }
+        // if(move != PASS) move = moves[random.rand(0, u32(moves.size()) - 1)];
+        b.make_move(moves[0], c);
         howmany++;
         c = !c;
     } 
@@ -54,7 +54,7 @@ float Search::uct1(const MCTSNode& p, const MCTSNode& v, bool pcol) const {
 i32 Search::bestuct(i32 g, bool col){
     int gmax = -1;
     float max = -INFINITY;
-    for(int i = 0; i < tree[g].chil.size(); i++){
+    for(int i = 0; i < int(tree[g].chil.size()); i++){
         const auto save = uct1(tree[g], tree[tree[g].chil[i]], col);
         if(save > max){
             max = save;
