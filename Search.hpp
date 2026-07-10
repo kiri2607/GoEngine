@@ -30,7 +30,5 @@ struct Search{
     SelectResult Selection();
     void Backprop(const SelectResult& sres);
     void Cycle();
-    void find_in_sub_tree(i32 g, std::vector<MCTSNode>& new_tree);  
-    void make_move(const Pos& pos);
-    Pos& get_best_move();
+    Pos get_best_move();
 };

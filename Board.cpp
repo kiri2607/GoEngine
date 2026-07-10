@@ -1,5 +1,5 @@
 #include "Board.hpp"
-
+#include "Random.hpp"
 #include "Types.hpp"
 #include <bitset>
 #include <cstdint>
@@ -25,13 +25,23 @@ Board::Board(float k){
     hist_hash.s(hash, true);
 }
 
-void Board::find_group(PosList& buff, const Pos& pos, BitBoard& vis){
+void Board::clear(){
+    vis.clear();
+    air.clear();
+    hash = Zobrist();
+    hist_hash.clear();
+    hist_hash.s(hash, true);
+    brd[0].clear();
+    brd[1].clear();
+}
+
+void Board::find_group(PosList& buff, const Pos& pos){
     static PosList stack = []() {
         PosList p;
-        p.list.reserve(DIM * DIM + 1);
+        p.reserve(DIM * DIM + 1);
         return p;
     }();
-
+    buff.clear();
     assert(pos.in_bounds());
     assert(brd[0].g(pos) || brd[1].g(pos));
     stack.clear();
@@ -54,12 +64,6 @@ void Board::find_group(PosList& buff, const Pos& pos, BitBoard& vis){
     }
 }
 
-void Board::find_group(PosList& buff, const Pos& pos){
-    static BitBoard vis;
-    vis.clear();
-    find_group(buff, pos, vis);
-}
-
 bool Board::is_eye(const Pos& pos, bool col){
     assert(pos.in_bounds());
     if(brd[0].g(pos) || brd[1].g(pos)) return false;
@@ -71,47 +75,29 @@ bool Board::is_eye(const Pos& pos, bool col){
     return true;
 }
 
-i8 Board::get_air(const Pos& pos, BitBoard& vis){
+i16 Board::get_air(const Pos& pos){
     assert(pos.in_bounds());
 
-    i8 odp = 4;
+    i16 odp = 4;
     for(const auto& dif : adjc){
         const Pos posa = pos + dif;
-        if(!posa.in_bounds() || vis.g(posa) || brd[0].g(posa) | brd[1].g(posa)){
+        if(!posa.in_bounds() || air.g(posa) || brd[0].g(posa) || brd[1].g(posa)){
             odp--;
             continue;
         }
-        vis.s(posa, 1);
+        air.s(posa, 1);
     }
     return odp;
 }
 
-
-i8 Board::get_air(const Pos& pos){
-    assert(pos.in_bounds());
-    i8 odp = 4;
-    for(const auto& dif : adjc){
-        const Pos posa = pos + dif;
-        if(!posa.in_bounds() || brd[0].g(posa) | brd[1].g(posa)){
-            odp--;
-        }
-    }
-    return odp;
-} 
-
-i8 Board::get_group_air(const PosList& group, BitBoard& vis) {
-    i8 odp = 0;
+i16 Board::get_group_air(const PosList& group) {
+    i16 odp = 0;
+    air.clear();
     for(auto pos : group){
         assert(pos.in_bounds());
-        odp += get_air(pos, vis);
+        odp += get_air(pos);
     }
     return odp;
-}
-
-i8 Board::get_group_air(const PosList& group) {
-    static BitBoard vis;
-    vis.clear();
-    return get_group_air(group, vis);
 }
 
 
@@ -123,54 +109,47 @@ void Board::revert_stone(const Pos& pos, bool col){
 }
 
 
-void Board::find_killed_groups(std::vector<PosList>& buff, const Pos& pos, bool col){
+void Board::find_killed_stones(PosList& buff, const Pos& pos, bool col){
+    buff.clear();
     static PosList group;
-    static BitBoard vis;
-    vis.clear();
-    group.clear();
     for(const auto& dif : adjc){
         const Pos posa = pos + dif;
         if(!posa.in_bounds()) continue;
         if(!brd[!col].g(posa)) continue;
         if(vis.g(posa)) continue;
-        find_group(group, posa, vis);
+        find_group(group, posa);
         if(get_group_air(group) == 0){
-            buff.push_back(group);
+            buff.insert(buff.end(), group.begin(), group.end());
         }
     }
 }
 
 bool Board::is_legal(const Pos& pos, bool col){
-    static std::vector<PosList> killed_groups;
-    static BitBoard vis;
+    static PosList killed_stones;
     static PosList group;
     group.clear();
     if(pos == PASS) return true;
     assert(pos.in_bounds());
     vis.clear();
     if(brd[0].g(pos) || brd[1].g(pos)) return false;
-    killed_groups.clear();
+    killed_stones.clear();
     revert_stone(pos, col);
 
-    find_killed_groups(killed_groups, pos, col);
-    find_group(group, pos, vis);
-    if(killed_groups.size() == 0 && get_group_air(group) == 0){
+    find_killed_stones(killed_stones, pos, col);
+    find_group(group, pos);
+    if(killed_stones.size() == 0 && get_group_air(group) == 0){
         revert_stone(pos, col);
         return false;
     }
 
-    for(auto g : killed_groups){
-        for(auto gpos : g){
-            revert_stone(gpos, !col);
-        }
+    for(const auto& g : killed_stones){
+        revert_stone(g, !col);
     }
 
     bool odp = false;
     if(!hist_hash.g(hash)) odp = true;
-    for(auto g : killed_groups){
-        for(auto gpos : g){
-            revert_stone(gpos, !col);
-        }
+    for(const auto& g : killed_stones){
+        revert_stone(g, !col);
     }
 
     revert_stone(pos, col);
@@ -179,7 +158,7 @@ bool Board::is_legal(const Pos& pos, bool col){
 
 
 void Board::make_move(const Pos& pos, bool col){
-    static std::vector<PosList> killed_groups;
+    static PosList killed_stones;
     if(pos == PASS){
         passes++;
         return;
@@ -190,13 +169,12 @@ void Board::make_move(const Pos& pos, bool col){
 
     passes = 0;
     
-    killed_groups.clear();
+    killed_stones.clear();
     revert_stone(pos, col);
-    find_killed_groups(killed_groups, pos, col);
-    for(auto g : killed_groups){
-        for(auto gpos : g){
-            revert_stone(gpos, !col);
-        }
+    vis.clear();
+    find_killed_stones(killed_stones, pos, col);
+    for(const auto& g : killed_stones){
+        revert_stone(g, !col);
     }
 }
 
@@ -208,74 +186,74 @@ void Board::filter_legal(PosList& poss, bool col){
             size++;
         }
     }
-    poss.list.resize(size);
+    poss.resize(size);
 }
 
 
 
-void Board::get_with_air_count(PosList& buff, bool col, i8 cnt){
-    static BitBoard vis;
-    static BitBoard air;
+void Board::get_with_air_count(PosList& buff, bool col, i16 cnt){
     static PosList group;
+    buff.clear();
     vis.clear();
-    for(i8 i = 0; i < DIM; i++){
-        for(i8 j = 0; j < DIM; j++){
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
             if(vis.g(i, j) || !brd[col].g(i, j)) continue;
-            air.clear();
             group.clear();
-            find_group(group, {i, j}, vis);
-            i8 gair = get_group_air(group, air);
+            find_group(group, {i, j});
+            i16 gair = get_group_air(group);
             if(gair == cnt){
                 air.find_ones(buff);
             }
         }
     }
     std::sort(buff.begin(), buff.end());
-    buff.list.erase(std::unique(buff.begin(), buff.end()), buff.end());
+    buff.erase(std::unique(buff.begin(), buff.end()), buff.end());
 }
 
-void Board::get_pseudo_legal_moves(PosList& buff, bool col){
-    static PosList myata;
-    static PosList opata;
-    get_with_air_count(myata, col, 1);
-    get_with_air_count(opata, !col, 1);
-    std::sort(myata.begin(), myata.end(), std::greater<Pos>());
-    std::sort(opata.begin(), opata.end(), std::greater<Pos>());
+
+void Board::get_legal_moves(PosList& buff, bool col){
     buff.clear();
-    for(i8 i = 0; i < DIM; i++){
-        for(i8 j = 0; j < DIM; j++){
-            while(!myata.empty() && myata.back() < Pos{i, j}) myata.pop();
-            while(!opata.empty() && opata.back() < Pos{i, j}) opata.pop();
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
             if(brd[0].g(i, j) || brd[1].g(i, j)) continue;
-            if((!myata.empty() && myata.back() == Pos{i, j} && (opata.empty() || opata.back() != Pos{i, j})) || ((opata.empty() || opata.back() != Pos{i, j}) && is_eye({i, j}, !col))){
-                continue;
-            }
-            buff.add({i, j});
+            if(is_legal({i, j}, col)) buff.add({i, j});
         }
     }
     buff.add(PASS);
 }
 
-
-void Board::get_legal_moves(PosList& buff, bool col){
-    get_pseudo_legal_moves(buff, col);
-    filter_legal(buff, col);
+Pos Board::get_random_legal(bool col, Rand& r){
+    static PosList freespots = []() {
+        PosList p;
+        p.reserve(DIM * DIM + 1);
+        return p;
+    }();
+    freespots.clear();
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
+            if(!brd[0].g(i, j) && !brd[1].g(i, j)) freespots.add({i, j});
+        }
+    }
+    freespots.add(PASS);
+    while(true){
+        i16 i = r.rand<i16>(0, i16(freespots.size()) - 1);
+        if(is_legal(freespots[i], col)) return freespots[i];
+    }
 }
-
 
 float Board::end_game_result(){
     static BitBoard scr[2];
     static PosList stack = []() {
         PosList p;
-        p.list.reserve(DIM * DIM + 1);
+        p.reserve(DIM * DIM + 1);
         return p;
     }();
     stack.clear();
     scr[0].clear();
     scr[1].clear();
     
-    for(i8 i = 0; i < DIM; i++){
-        for(i8 j = 0; j < DIM; j++){
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
             if(brd[0].g(i, j)){
                 stack.add({i, j});
                 scr[0].s(i, j, 1);
@@ -294,8 +272,8 @@ float Board::end_game_result(){
         }
     }
 
-    for(i8 i = 0; i < DIM; i++){
-        for(i8 j = 0; j < DIM; j++){
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
             if(brd[1].g(i, j)){
                 stack.add({i, j});
                 scr[1].s(i, j, 1);
@@ -315,8 +293,8 @@ float Board::end_game_result(){
     }
 
     float score[2] = {0, komi};
-    for(i8 i = 0; i < DIM; i++){
-        for(i8 j = 0; j < DIM; j++){
+    for(i16 i = 0; i < DIM; i++){
+        for(i16 j = 0; j < DIM; j++){
             if(scr[0].g(i, j) && scr[1].g(i, j)) continue;
             else if(scr[0].g(i, j)) score[0]++;
             else if(scr[1].g(i, j)) score[1]++;

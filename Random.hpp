@@ -12,28 +12,14 @@ struct Rand{
     Rand(i64 seed = 213769420){
         gen.seed(seed);
     }
-    u64 randll(){
-        static std::uniform_int_distribution<u64> dist;
+    template<typename T>
+    T rand(){
+        std::uniform_int_distribution<T> dist;
         return dist(gen);
     }
-    u64 randll(u64 a, u64 b){
-        std::uniform_int_distribution<u64> dist(a, b);
-        return dist(gen);
-    }
-    u32 rand(){
-        static std::uniform_int_distribution<u32> dist;
-        return dist(gen);
-    }
-    u32 rand(u32 a, u32 b){
-        std::uniform_int_distribution<u32> dist(a, b);
-        return dist(gen);
-    }
-    u32 randb(){
-        static std::uniform_int_distribution<u32> dist;
-        return dist(gen);
-    }
-    u32 randb(u32 a, u32 b){
-        std::uniform_int_distribution<u32> dist(a, b);
+    template<typename T>
+    T rand(T a, T b){
+        std::uniform_int_distribution<T> dist(a, b);
         return dist(gen);
     }
     float randf(){
